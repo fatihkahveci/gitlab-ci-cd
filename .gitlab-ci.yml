@@ -1,0 +1,37 @@
+image: registry.gitlab.com/REPO_URL:latest
+
+services:
+  - mysql:5.7
+  - redis:latest
+
+variables:
+  MYSQL_DATABASE: symfony
+  MYSQL_ROOT_PASSWORD: root
+  DB_HOST: mysql
+  DB_USERNAME: root
+
+stages:
+  - test
+  - deploy
+
+unit_test:
+  stage: test
+  script:
+    - cp .env.dist .env
+    - composer install
+    - bin/console doctrine:schema:update --force
+    - bin/phpunit
+
+deploy_prod:
+  stage: deploy
+  when: manual
+  only:
+    - master
+  script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$SSH_PRIVATE")
+    - mkdir -p ~/.ssh
+    - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+    - composer install
+    - php vendor/bin/dep deploy
